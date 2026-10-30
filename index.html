@@ -12,48 +12,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Font Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<script>
-    // 1. Deklarasi API URL Google Apps Script Anda
-const API_URL = "https://script.google.com/macros/s/AKfycbzlOuF6JOqtZSsDVl9ZJyYKaP4LdInI1guso_Zj7bXO0loI3ZliQtdmWD6KDuK1i0zwtA/exec"; // Pastikan URL Anda sudah benar di sini
-
-// Data tiket (Kosongkan secara default agar tidak menampilkan dummy)
-let tickets = [];
-
-// Fungsi untuk mengambil data asli dari Google Sheets
-async function loadTicketsFromSheets() {
-  if (!API_URL || API_URL.includes("https://script.google.com/macros/s/AKfycbzlOuF6JOqtZSsDVl9ZJyYKaP4LdInI1guso_Zj7bXO0loI3ZliQtdmWD6KDuK1i0zwtA/exec")) {
-    console.warn("API_URL belum diisi dengan benar.");
-    return;
-  }
-
-  try {
-    // Tampilkan indikator loading (opsional)
-    const response = await fetch(API_URL);
-    const data = await response.json();
-
-    // Jika data dari Google Sheets berupa Array, gunakan data tersebut
-    if (Array.isArray(data)) {
-      // Mapping field dari Google Sheets ke format JavaScript jika diperlukan
-      tickets = data.map(item => ({
-        id: item.id || item.ID,
-        kode: item.kode || item.Kode || "TCK-000",
-        judul: item.judul || item.Judul || "",
-        kategori: item.kategori || item.Kategori || "Lainnya",
-        pelapor: item.pelapor || item.Pelapor || "User",
-        prioritas: item.prioritas || item.Prioritas || "Low",
-        status: item.status || item.Status || "Open",
-        tanggal: item.tanggal ? String(item.tanggal).substring(0, 10) : new Date().toISOString().split('T')[0]
-      }));
-
-      // Render ulang seluruh tampilan dashboard & tabel dengan data asli
-      renderAll();
-      console.log("Data berhasil dimuat dari Google Sheets:", tickets);
-    }
-  } catch (error) {
-    console.error("Gagal memuat data dari Google Sheets:", error);
-  }
-}
-
 // Jalankan fungsi ini begitu halaman selesai di-load
 document.addEventListener("DOMContentLoaded", () => {
   loadTicketsFromSheets();
