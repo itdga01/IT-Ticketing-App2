@@ -670,6 +670,30 @@
         </div>
     </main>
 
+    <!-- MODAL KONFIRMASI HAPUS TIKET -->
+    <div id="modal-delete-ticket" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center hidden p-4">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-100 animate-in fade-in zoom-in duration-150">
+            <div class="p-6 text-center space-y-4">
+                <div class="w-14 h-14 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center text-2xl mx-auto shadow-inner">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-slate-800">Konfirmasi Hapus Tiket</h3>
+                    <p class="text-sm text-slate-600 mt-1">Apakah anda yakin ingin di Hapus?</p>
+                    <p id="delete-ticket-info" class="text-xs font-mono text-slate-400 mt-2 bg-slate-50 py-1.5 px-3 rounded-lg border border-slate-200 inline-block"></p>
+                </div>
+                <div class="flex items-center justify-center gap-3 pt-2">
+                    <button type="button" onclick="closeDeleteTicketModal()" class="w-1/2 py-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors">
+                        Batal
+                    </button>
+                    <button type="button" onclick="confirmDeleteTicket()" class="w-1/2 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md shadow-red-500/20 transition-all">
+                        Ya, Hapus
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- TICKET DETAIL MODAL -->
     <div id="modal-ticket-detail" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
         <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -1240,8 +1264,8 @@
             }
 
             if (barChartInstance) {
-                const categories = ['Hardware', 'Software', 'Jaringan', 'Akses User', 'Printer', 'Lainnya'];
-                const counts = categories.map(cat => tickets.filter(t => t.category === cat).length);
+                const categoriesList = ['Hardware', 'Software', 'Jaringan', 'Akses User', 'Printer', 'Lainnya'];
+                const counts = categoriesList.map(cat => tickets.filter(t => t.category === cat).length);
                 barChartInstance.data.datasets[0].data = counts;
                 barChartInstance.update();
             }
@@ -1301,13 +1325,51 @@
                         <td class="py-3.5 px-4">${statusBadge}</td>
                         <td class="py-3.5 px-4 text-xs font-medium text-slate-600">${t.tech || '-'}</td>
                         <td class="py-3.5 px-4 text-center">
-                            <button onclick="openModal('${t.id}')" class="px-3 py-1.5 bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-600 rounded-lg text-xs font-bold transition-all">
-                                Detail
-                            </button>
+                            <div class="flex items-center justify-center gap-1.5">
+                                <button onclick="openModal('${t.id}')" class="px-3 py-1.5 bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-600 rounded-lg text-xs font-bold transition-all flex items-center gap-1">
+                                    <i class="fa-solid fa-eye text-[11px]"></i> Detail
+                                </button>
+                                <button onclick="promptDeleteTicket('${t.id}')" class="px-2.5 py-1.5 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 hover:border-red-600 rounded-lg text-xs font-bold transition-all flex items-center gap-1" title="Hapus Tiket">
+                                    <i class="fa-solid fa-trash-can text-[11px]"></i> Hapus
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 `;
             }).join('');
+        }
+
+        // Modal Konfirmasi Hapus Tiket Logic
+        let ticketToDeleteId = null;
+
+        function promptDeleteTicket(ticketId) {
+            ticketToDeleteId = ticketId;
+            const infoEl = document.getElementById('delete-ticket-info');
+            if (infoEl) {
+                const t = tickets.find(x => x.id === ticketId);
+                infoEl.innerText = t ? `${t.id} - ${t.title}` : ticketId;
+            }
+            document.getElementById('modal-delete-ticket').classList.remove('hidden');
+        }
+
+        function closeDeleteTicketModal() {
+            document.getElementById('modal-delete-ticket').classList.add('hidden');
+            ticketToDeleteId = null;
+        }
+
+        function confirmDeleteTicket() {
+            if (!ticketToDeleteId) return;
+
+            const targetIndex = tickets.findIndex(t => t.id === ticketToDeleteId);
+            if (targetIndex !== -1) {
+                const deletedId = tickets[targetIndex].id;
+                tickets.splice(targetIndex, 1);
+                updateDashboardStats();
+                renderTicketTable();
+                showToast(`Tiket ${deletedId} telah berhasil dihapus!`);
+            }
+
+            closeDeleteTicketModal();
         }
 
         // Handle Form New Ticket Submit
@@ -1452,6 +1514,154 @@
             }).join('');
         }
 
+        // Render Master Departemen Table
+        function renderDeptTable() {
+            const tbody = document.getElementById('dept-table-body');
+            if (!tbody) return;
+
+            const totalDepts = departments.length;
+            const activeDepts = departments.filter(d => d.status === 'Active').length;
+            const totalStaff = departments.reduce((acc, curr) => acc + (curr.staffCount || 0), 0);
+
+            document.getElementById('stat-dept-total').innerText = totalDepts;
+            document.getElementById('stat-dept-active').innerText = activeDepts;
+            document.getElementById('stat-dept-staff').innerText = totalStaff;
+
+            if (departments.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-slate-400 font-medium">Belum ada data departemen.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = departments.map(d => {
+                let statusBadge = d.status === 'Active' 
+                    ? '<span class="inline-flex items-center gap-1.5 text-emerald-600 font-bold text-xs"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>Active</span>'
+                    : '<span class="inline-flex items-center gap-1.5 text-slate-400 font-medium text-xs"><span class="w-2 h-2 rounded-full bg-slate-300"></span>Inactive</span>';
+
+                return `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="py-3.5 px-4 font-mono text-xs font-bold text-blue-600">${d.id}</td>
+                        <td class="py-3.5 px-4 font-semibold text-slate-800">${d.name}</td>
+                        <td class="py-3.5 px-4 text-xs text-slate-600">${d.hod || '-'}</td>
+                        <td class="py-3.5 px-4 text-xs text-slate-500">${d.location || '-'}</td>
+                        <td class="py-3.5 px-4 text-xs font-bold text-slate-700">${d.staffCount || 0} Orangnya</td>
+                        <td class="py-3.5 px-4">${statusBadge}</td>
+                        <td class="py-3.5 px-4 text-center">
+                            <button onclick="editDept('${d.id}')" class="px-2.5 py-1 text-xs font-medium border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 mr-1" title="Edit Departemen">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
+                            <button onclick="toggleDeptStatus('${d.id}')" class="px-2.5 py-1 text-xs font-medium border border-slate-200 rounded-lg hover:bg-slate-100 mr-1" title="Ubah Status Active/Inactive">
+                                <i class="fa-solid fa-power-off ${d.status === 'Active' ? 'text-emerald-600' : 'text-slate-400'}"></i>
+                            </button>
+                            <button onclick="deleteDept('${d.id}')" class="px-2.5 py-1 text-xs font-medium border border-red-200 text-red-600 rounded-lg hover:bg-red-50" title="Hapus Departemen">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Populate Select Dept Options dynamically
+        function populateDeptSelectOptions() {
+            const activeDepts = departments.filter(d => d.status === 'Active');
+            const optionsHtml = activeDepts.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
+
+            const userDeptSelect = document.getElementById('user-dept');
+            if (userDeptSelect) userDeptSelect.innerHTML = optionsHtml;
+
+            const ticketDeptSelect = document.getElementById('input-dept');
+            if (ticketDeptSelect) ticketDeptSelect.innerHTML = optionsHtml;
+        }
+
+        // Modal Departemen Functions
+        function openAddDeptModal() {
+            document.getElementById('edit-dept-id').value = '';
+            document.getElementById('dept-modal-title').innerText = 'Tambah Departemen Baru';
+            document.getElementById('dept-modal-icon').className = 'fa-solid fa-sitemap text-blue-400';
+            document.getElementById('dept-modal-submit-btn').innerText = 'Simpan Departemen';
+            document.getElementById('form-add-dept').reset();
+            document.getElementById('modal-add-dept').classList.remove('hidden');
+        }
+
+        function closeAddDeptModal() {
+            document.getElementById('modal-add-dept').classList.add('hidden');
+            document.getElementById('form-add-dept').reset();
+            document.getElementById('edit-dept-id').value = '';
+        }
+
+        function editDept(deptId) {
+            const dept = departments.find(d => d.id === deptId);
+            if (!dept) return;
+
+            document.getElementById('edit-dept-id').value = dept.id;
+            document.getElementById('dept-code').value = dept.id;
+            document.getElementById('dept-name').value = dept.name;
+            document.getElementById('dept-hod').value = dept.hod || '';
+            document.getElementById('dept-location').value = dept.location || '';
+            document.getElementById('dept-status').value = dept.status;
+
+            document.getElementById('dept-modal-title').innerText = `Edit Departemen (${dept.id})`;
+            document.getElementById('dept-modal-icon').className = 'fa-solid fa-pen-to-square text-blue-400';
+            document.getElementById('dept-modal-submit-btn').innerText = 'Update Departemen';
+
+            document.getElementById('modal-add-dept').classList.remove('hidden');
+        }
+
+        function handleAddDept(e) {
+            e.preventDefault();
+            const editId = document.getElementById('edit-dept-id').value;
+            const codeInput = document.getElementById('dept-code').value.toUpperCase().trim();
+
+            if (editId) {
+                const deptIndex = departments.findIndex(d => d.id === editId);
+                if (deptIndex !== -1) {
+                    departments[deptIndex].id = codeInput;
+                    departments[deptIndex].name = document.getElementById('dept-name').value;
+                    departments[deptIndex].hod = document.getElementById('dept-hod').value;
+                    departments[deptIndex].location = document.getElementById('dept-location').value;
+                    departments[deptIndex].status = document.getElementById('dept-status').value;
+
+                    showToast(`Departemen ${departments[deptIndex].name} berhasil diperbarui!`);
+                }
+            } else {
+                const newDept = {
+                    id: codeInput,
+                    name: document.getElementById('dept-name').value,
+                    hod: document.getElementById('dept-hod').value,
+                    location: document.getElementById('dept-location').value,
+                    staffCount: 0,
+                    status: document.getElementById('dept-status').value
+                };
+
+                departments.push(newDept);
+                showToast(`Departemen ${newDept.name} (${newDept.id}) berhasil ditambahkan!`);
+            }
+
+            renderDeptTable();
+            populateDeptSelectOptions();
+            closeAddDeptModal();
+        }
+
+        function toggleDeptStatus(deptId) {
+            const dept = departments.find(d => d.id === deptId);
+            if (dept) {
+                dept.status = dept.status === 'Active' ? 'Inactive' : 'Active';
+                renderDeptTable();
+                populateDeptSelectOptions();
+                showToast(`Status departemen ${dept.name} diubah menjadi ${dept.status}`);
+            }
+        }
+
+        function deleteDept(deptId) {
+            const dept = departments.find(d => d.id === deptId);
+            if (dept) {
+                departments = departments.filter(d => d.id !== deptId);
+                renderDeptTable();
+                populateDeptSelectOptions();
+                showToast(`Departemen ${dept.name} berhasil dihapus.`);
+            }
+        }
+
         // User Management Actions
         function openAddUserModal() {
             document.getElementById('edit-user-id').value = '';
@@ -1586,6 +1796,7 @@
             document.getElementById('login-screen').classList.remove('hidden');
             showToast('Anda telah logout dari sistem.');
         }
+
         // Populate Select Category Options dynamically
         function populateCatSelectOptions() {
             const activeCats = categories.filter(c => c.status === 'Active');
